@@ -1,0 +1,96 @@
+﻿@page "/search"
+@inject HttpClient http
+<h1>Search</h1>
+<EditForm Model="model" OnValidSubmit="Refresh" class="pb-2">
+    <div class="form-group">
+        <label>By text:</label>
+        <InputText @bind-Value="model.Text" class="form-control" />
+        <ValidationMessage For="() => model.Text" />
+    </div>
+    <div class="form-group">
+        <label>From:</label>
+        <InputDate @bind-Value="model.From" class="form-control" />
+        <ValidationMessage For="() => model.From" />
+    </div>
+    <div class="form-group">
+        <label>To:</label>
+        <InputDate @bind-Value="model.To" class="form-control" />
+        <ValidationMessage For="() => model.To" />
+    </div>
+    <button class="btn btn-primary">Search</button>
+</EditForm>
+
+@if (Items is null)
+{
+    <h6>Loading.... Please wait</h6>
+}
+else if (Items.Count is 0)
+{
+    <h6>There are no items matching your search.</h6>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Uploaded</th>
+                <th>Watch</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Items)
+            {
+                <tr>
+                    <td>
+                        @item.Title
+                    </td>
+                    <td>
+                        @item.Uploaded.ToShortDateString()
+                    </td>
+                    <td>
+                        @foreach (var res in item.AvailableResolutions.Split(','))
+                        {
+                            <a href="@($"{baseVideoUrl}/{item.FileId}/{res}.mp4?token={System.Web.HttpUtility.UrlEncode(item.Token)}")" target="_blank">@(res)p</a><text>&nbsp;</text>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" />
+}
+
+
+
+@code {
+    string baseVideoUrl;
+
+    public CatalogSearchModel model = new();
+
+    List<CatalogItemWithToken> Items;
+
+    int pages = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        model.Page = 1;
+        baseVideoUrl = await http.GetStringAsync("/api/v1/Videos/GetBaseUrl");
+        pages = await http.GetFromJsonAsync<int>("/api/v1/Catalog/GetNumberOfPages");
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        var queries = model.DataToQueryString();
+
+        Items = await http.GetFromJsonAsync<List<CatalogItemWithToken>>($"/api/v1/Catalog/Search?{queries}");
+    }
+
+    private async Task ChangePageTo(int newPage)
+    {
+        model.Page = newPage;
+        await Refresh();
+    }
+
+}

@@ -1,0 +1,94 @@
+﻿@page "/admin/settings"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient http
+
+<h1>Admin/Settings</h1>
+
+@if (model is null)
+{
+    <h2>Loading...</h2>
+}
+else
+{
+<EditForm Model="model" OnValidSubmit="SubmitChanges">
+    <div class="form-group">
+        <h4>Enabled encoding resolution </h4>
+        <span>(will only applied on unstarted encodings!)</span>
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode360p" DisplayName="" id="check360p" />
+            <label class="custom-control-label" for="check360p">360p</label>
+        </div>
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode480p" DisplayName="" id="check480p" />
+            <label class="custom-control-label" for="check480p">SD (480p)</label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode720p" DisplayName="" id="check720p" />
+            <label class="custom-control-label" for="check720p">HD (720p)</label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode1080p" DisplayName="" id="check1080p" />
+            <label class="custom-control-label" for="check1080p">FHD (1080p)</label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode2160p" DisplayName="" id="check2160p" />
+            <label class="custom-control-label" for="check2160p">4K (2160p)</label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.Encode4320p" DisplayName="" id="check4320p" />
+            <label class="custom-control-label" for="check4320p">8K (4320p)</label>
+        </div>
+
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.KeepCache" DisplayName="" id="checkKeepCache" />
+            <label class="custom-control-label" for="checkKeepCache">Keep Cache upload cache even afetr encoded</label>
+        </div>
+    </div>
+    <div class="form-group">
+        <h4>Tokens for Videos</h4>
+        <div class="custom-control custom-checkbox">
+            <InputCheckbox class="custom-control-input" @bind-Value="model.UseTokens" DisplayName="" id="checkUseTokens" />
+            <label class="custom-control-label" for="checkUseTokens">Use tokens for videos</label>
+        </div>
+        <div class="form-group">
+            <label>Token expiry (in minutes)</label>
+            <InputNumber class="form-control" @bind-Value="model.TokenExpiry" />
+        </div>
+    </div>
+    <button class="btn btn-danger" type="button" @onclick="RollbackSettings">Revert</button>
+    <button class="btn btn-secondary" type="button" @onclick="ResetToDefaults">Reset To Defaults</button>
+    <br />
+    <button class="btn btn-success" type="submit">Save</button>
+</EditForm>
+}
+
+@code {
+    VideoCdnSettings model;
+    VideoCdnSettings beforeChange;  
+
+    protected async override Task OnInitializedAsync()
+    {
+        model = await http.GetFromJsonAsync<VideoCdnSettings>("/api/v1/Admin/Settings");
+        beforeChange = model;
+    }
+
+    private void RollbackSettings()
+    {
+        model = beforeChange;
+    }
+
+    private void ResetToDefaults()
+    {
+        model = new();
+    }
+
+    private async Task SubmitChanges()
+    {
+        await http.PostAsJsonAsync("/api/v1/Admin/Settings", model);
+        beforeChange = model;
+    }
+}

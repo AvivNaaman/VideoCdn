@@ -1,0 +1,68 @@
+﻿@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient http
+@inject NavigationManager navigation
+
+<h1>Admin/Users</h1>
+
+<button class="m-2 btn btn-primary" @onclick="@(() => navigation.NavigateTo("/admin/users/create"))">Create</button>
+
+<EditForm Model="model">
+    <div class="form-group">
+        <label>By User Name or Email</label>
+        <InputText @bind-Value="model.Text" class="form-control" />
+    </div>
+</EditForm>
+
+@if (data is null)
+{
+    <h6>Loading...</h6>
+}
+else if (data.Count is 0)
+{
+    <h6>It's a little bit weird that there are no users... Try to refresh or restart the app.</h6>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>User Name</th>
+                <th>Email Address</th>
+                <th>Roles</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var u in data)
+            {
+            <tr>
+                <td>@u.Id</td>
+                <td>@u.UserName</td>
+                <td>@u.Email</td>
+                <td>@string.Join(", ", u.Roles)</td>
+                <td></td>
+            </tr>
+            }
+        </tbody>
+    </table>
+    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" />
+}
+
+@code {
+    List<UserModel> data;
+    public UserSearchModel model = new();
+    int pages = 1;
+    protected async override Task OnInitializedAsync()
+    {
+        model.Page = 1;
+        pages = await http.GetFromJsonAsync<int>("/api/v1/Admin/Users/NumberOfPages");
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        data = await http.GetFromJsonAsync<List<UserModel>>($"/api/v1/Admin/Users?{model.DataToQueryString()}");
+    }
+}

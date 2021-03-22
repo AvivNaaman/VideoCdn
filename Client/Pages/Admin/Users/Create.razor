@@ -1,0 +1,32 @@
+﻿@page "/admin/users/create"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient http
+@inject NavigationManager navigation
+
+<h1>Edit User</h1>
+<EditForm Model="model" OnValidSubmit="ValidSubmit">
+    <DataAnnotationsValidator />
+    <div class="form-group">
+        <label>User Name</label>
+        <InputText class="form-control" @bind-Value="model.UserName" />
+        <ValidationMessage For="() => model.UserName" />
+    </div>
+
+    <div class="form-group">
+        <label>Email Address</label>
+        <InputText class="form-control" @bind-Value="model.Email" />
+        <ValidationMessage For="() => model.Email" />
+    </div>
+
+    <button class="btn btn-success" type="submit">Create</button>
+</EditForm>
+
+@code {
+    private CreateUserModel model = new();
+
+    private async Task ValidSubmit()
+    {
+        await http.PostAsJsonAsync<CreateUserModel>($"/api/v1/Admin/CreateUser", model);
+        navigation.NavigateTo("/admin/users");
+    }
+}

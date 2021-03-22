@@ -1,0 +1,77 @@
+﻿@page "/queue"
+@inject HttpClient http
+
+<h1>Queue</h1>
+
+@if (Items is null)
+{
+    <h6>Loading.... Please wait</h6>
+}
+else
+{
+    <button @onclick="Refresh" class="btn btn-primary pt-2 mb-2"><span class="oi oi-reload" aria-hidden="true"></span></button>
+    @if (Items.Count is 0)
+    {
+        <h6>The Queue is currently empty.</h6>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Added to queue</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                <tr>
+                    <td>
+                        @item.Item.Title
+                    </td>
+                    <td>
+                        @item.Item.Uploaded
+                    </td>
+                    @if (item.Status is EncodingStatus.Waiting)
+                    {
+                        <td class="text-secondary">
+                            Waiting
+                        </td>
+                        <td></td>
+                    }
+                    else if (item.Status is EncodingStatus.Running)
+                    {
+                        <td class="text-success">
+                            Running..
+                        </td>
+                        <td>
+                            @item.Started
+                        </td>
+                    }
+                </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+
+
+@code {
+
+    List<EnqueuedItemModel> Items;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+    }
+
+    private async Task Refresh()
+    {
+        Items = await http.GetFromJsonAsync<List<EnqueuedItemModel>>($"/api/v1/Videos/Queue");
+    }
+
+}

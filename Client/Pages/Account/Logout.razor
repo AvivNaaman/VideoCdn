@@ -1,0 +1,14 @@
+﻿@page "/logout"
+@inject IAuthService authService
+@inject NavigationManager navManager
+<h1>You're being logger out...</h1>
+
+@code {
+    LoginModel model = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await authService.Logout();
+        navManager.NavigateTo("/");
+    }
+}

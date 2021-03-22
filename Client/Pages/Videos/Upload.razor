@@ -1,0 +1,97 @@
+﻿@page "/upload"
+@inject HttpClient http
+@attribute [Authorize]
+
+<h1>Video Upload</h1>
+
+<EditForm Model="formModel" OnValidSubmit="ValidSubmit" class="pb-2">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label>Title</label>
+        <InputText @bind-Value="formModel.Title" class="form-control"/>
+        <ValidationMessage For="() => formModel.Title" />
+    </div>
+
+    <div class="custom-file">
+        <InputFile OnChange="@OnInputFileChange" class="custom-file-input" id="inputUpload" accept="video/*" disabled="@(isLoading)" required />
+        <label class="custom-file-label" for="inputUpload">Choose file</label>
+    </div>
+
+
+    @if (!isLoading)
+    {
+        <button class="btn btn-primary my-2" type="submit">Upload</button>
+    }
+    else if (numberOfChunks > 0) @* Upload started *@
+    {
+        <div class="my-2">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                     role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: @((currentChunk*100.0)/numberOfChunks)%"></div>
+            </div>
+        </div>
+        <button @onclick="CancelButtonClicked" class="btn btn-danger">Cancel</button>
+    }
+</EditForm>
+@code {
+    const int ChunkSize = 512000;
+
+    private InputFileChangeEventArgs lastChangeArgs;
+    private CancellationTokenSource src = new CancellationTokenSource();
+    private bool isLoading = false;
+    private string currentFileId;
+    private long numberOfChunks;
+    private long currentChunk;
+
+    private StartChunkUploadModel formModel = new();
+
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        lastChangeArgs = e;
+        formModel.FileName = e.File.Name;
+    }
+
+    private async Task ValidSubmit()
+    {
+        isLoading = true;
+        StateHasChanged();
+        // first, initiate the upload TODO: handle weird file names, better error handling
+        var initRes = await http.PostAsJsonAsync($"/api/v1/Videos/StartChunked", formModel);
+        if (!initRes.IsSuccessStatusCode) throw new Exception();
+
+        currentFileId = await initRes.Content.ReadAsStringAsync();
+        byte[] chunk = new byte[ChunkSize];
+
+        long fileSize = lastChangeArgs.File.Size;
+        numberOfChunks = fileSize / ChunkSize + 1;
+        currentChunk = 0;
+        var file = lastChangeArgs.File.OpenReadStream(int.MaxValue);
+        // while there is more to read
+        while (await file.ReadAsync(chunk, 0, ChunkSize) > 0)
+        {
+            currentChunk += 1;
+            StateHasChanged();
+            var data = new MultipartFormDataContent();
+            data.Add(new ByteArrayContent(chunk), "Data", lastChangeArgs.File.Name);
+            data.Add(new StringContent(currentFileId), "id");
+            if (src.IsCancellationRequested) return;
+            await http.PostAsync($"/api/v1/Videos/UploadChunk", data, src.Token);
+        }
+        if (src.IsCancellationRequested) return;
+        await http.PostAsync($"/api/v1/Videos/FinishChunked?id={currentFileId}", null);
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+
+    private async Task CancelButtonClicked()
+    {
+        isLoading = false;
+        await http.PostAsync($"/api/v1/Videos/AbortChunked?id={currentFileId}", null);
+        src.Cancel();
+        StateHasChanged();
+    }
+
+}

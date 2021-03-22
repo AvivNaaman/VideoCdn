@@ -1,0 +1,45 @@
+﻿<nav aria-label="Page navigation example">
+    <ul class="pagination">
+        @if (CurrentPage > 2)
+        {
+            <li class="page-item"><button class="page-link" @onclick="() => ChangePageTo(1)">1</button></li>
+            @if (CurrentPage != 3)
+            {
+                <li class="page-item disabled"><a class="page-link">...</a></li>
+            }
+        }
+        @if (CurrentPage > 1)
+        {
+            <li class="page-item"><button class="page-link" @onclick="() => ChangePageTo(CurrentPage - 1)">@(CurrentPage - 1)</button></li>
+        }
+        <li class="page-item active"><button class="page-link">@CurrentPage</button></li>
+        @if (CurrentPage < NumberOfPages)
+        {
+            <li class="page-item"><button class="page-link" @onclick="() => ChangePageTo(CurrentPage + 1)">@(CurrentPage + 1)</button></li>
+        }
+        @if (CurrentPage < NumberOfPages - 1)
+        {
+            if (CurrentPage != NumberOfPages - 2)
+            {
+                <li class="page-item disabled"><a class="page-link">...</a></li>
+            }
+            <li class="page-item"><button class="page-link" @onclick="() => ChangePageTo(NumberOfPages)">@NumberOfPages</button></li>
+        }
+    </ul>
+</nav>
+
+@code {
+    [Parameter]
+    public int CurrentPage { get; set; }
+    [Parameter]
+    public EventCallback<int> CurrentPageChanged { get; set; }
+
+    [Parameter]
+    public int NumberOfPages { get; set; }
+
+    private async Task ChangePageTo(int to)
+    {
+        CurrentPage = to;
+        await CurrentPageChanged.InvokeAsync();
+    }
+}

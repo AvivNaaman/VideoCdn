@@ -1,0 +1,55 @@
+﻿@page "/login"
+@inject IAuthService authService
+@inject NavigationManager navManager
+<h1>Login</h1>
+@if (isLoading)
+{
+    <div class="">Loading...</div>
+}
+else
+{
+
+    if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+        </div>
+    }
+
+    <EditForm Model="model" OnValidSubmit="ValidSubmit">
+        <div class="form-group">
+            <label>User Name</label>
+            <InputText @bind-Value="model.UserName" class="form-control" />
+            <ValidationMessage For="() => model.UserName" />
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <InputText @bind-Value="model.Password" class="form-control" type="password" />
+            <ValidationMessage For="() => model.Password" />
+        </div>
+        <button class="btn btn-primary">Go</button>
+    </EditForm>
+}
+@code {
+    LoginModel model = new();
+
+    string errorMessage = "";
+
+    bool isLoading;
+
+    private async Task ValidSubmit()
+    {
+        isLoading = true;
+        var res = await authService.Login(model.UserName, model.Password);
+        if (res is null)
+        {
+            errorMessage = "Authentication Failed!";
+            model.Password = "";
+        }
+        else
+        {
+            navManager.NavigateTo("/");
+        }
+        isLoading = false;
+    }
+}

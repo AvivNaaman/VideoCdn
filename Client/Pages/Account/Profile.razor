@@ -1,0 +1,12 @@
+﻿@page "/profile"
+@attribute [Authorize]
+@using System.Security.Claims
+<h1>Profile</h1>
+<AuthorizeView>
+    <h3>@context.User.FindFirst(ClaimTypes.Name)?.Value</h3>
+    <h4>@context.User.FindFirst(ClaimTypes.Email)?.Value</h4>
+    <h6>Roles: @string.Join(", ", context.User.FindAll(c => c.Type == ClaimTypes.Role))</h6>
+</AuthorizeView>
+
+@code {
+}

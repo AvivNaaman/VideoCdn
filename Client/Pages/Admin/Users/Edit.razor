@@ -1,0 +1,58 @@
+﻿@page "/admin/users/{id:int}"
+@attribute [Authorize(Roles = "Admin")]
+@inject HttpClient http
+@inject NavigationManager navigation
+
+<h1>Edit User</h1>
+@if (model is null)
+{
+    <h6>Loading...</h6>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="ValidSubmit">
+        <DataAnnotationsValidator />
+        <div class="form-group">
+            <label>User Name</label>
+            <InputText class="form-control" @bind-Value="model.UserName" />
+            <ValidationMessage For="() => model.UserName" />
+        </div>
+
+        <div class="form-group">
+            <label>Email Address</label>
+            <InputText class="form-control" @bind-Value="model.Email" />
+            <ValidationMessage For="() => model.Email" />
+        </div>
+
+        <button class="btn btn-success" type="submit">Save</button>
+    </EditForm>
+}
+@code {
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private UserModel model;
+
+    private List<string> allRoles;
+
+    private List<string> userRoles;
+    private List<string> leftRoles;
+
+    string currSelection = "";
+
+    protected async override Task OnInitializedAsync()
+    {
+        model = await http.GetFromJsonAsync<UserModel>($"/api/v1/Admin/GetUserById?id={Id}");
+        userRoles = model.Roles.ToList();
+
+        allRoles = await http.GetFromJsonAsync<List<string>>("/api/v1/Admin/Roles");
+        // TODO: Future: Add/Remove roles
+    }
+
+    private async Task ValidSubmit()
+    {
+        await http.PostAsJsonAsync<UserModel>($"/api/v1/Admin/UpdateUser", model);
+        navigation.NavigateTo("/admin/users");
+    }
+}
