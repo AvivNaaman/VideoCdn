@@ -17,7 +17,6 @@ namespace VideoCdn.Web.Server.Services
         const int MaxRunningProcesses = 1;
 
         private readonly ILogger<VideoEncodingQueue> _logger;
-        private readonly ISettingsService<VideoCdnSettings> _settingsService;
         private readonly VideoServerOptions _options;
 
         private Dictionary<TempCatalogItemInfo, VideoEncodingTask> runningTasks = new();
@@ -25,17 +24,16 @@ namespace VideoCdn.Web.Server.Services
 
         public int RunningProcesses => runningTasks.Count;
 
-        public VideoEncodingQueue(ILogger<VideoEncodingQueue> logger, IOptions<VideoServerOptions> options, ISettingsService<VideoCdnSettings> settingsService)
+        public VideoEncodingQueue(ILogger<VideoEncodingQueue> logger, IOptions<VideoServerOptions> options)
         {
             _logger = logger;
-            _settingsService = settingsService;
             _options = options.Value;
         }
 
-        public async Task Add(TempCatalogItemInfo item)
+        public async Task Add(TempCatalogItemInfo item, VideoCdnSettings currentSettings)
         {
             _logger.LogInformation("Added to encoding queue {0}", item.FileId);
-            waitingTasks.Add(item, new VideoEncodingTask());
+            waitingTasks.Add(item, new VideoEncodingTask() {  CurrentSettings = (VideoCdnSettings)currentSettings.Clone(), TempFileName = item.FileId + item.Extension });
             await StartNextIfCan();
         }
 
@@ -61,7 +59,7 @@ namespace VideoCdn.Web.Server.Services
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        Arguments = await VideoEncodingHelper.BuildEncodingArgs(toStart.Value.TempFileName, _options, _settingsService.Settings),
+                        Arguments = await VideoEncodingHelper.BuildEncodingArgs(toStart.Value.TempFileName, _options, toStart.Value.CurrentSettings),
                         FileName = "ffmpeg",
                         UseShellExecute = false,
                         CreateNoWindow = true,
@@ -118,5 +116,6 @@ namespace VideoCdn.Web.Server.Services
     {
         public Process RunningProcess { get; set; }
         public string TempFileName { get; set; }
+        public VideoCdnSettings CurrentSettings { get; set; }
     }
 }

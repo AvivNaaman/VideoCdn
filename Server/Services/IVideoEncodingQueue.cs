@@ -9,7 +9,7 @@ namespace VideoCdn.Web.Server.Services
     {
         int RunningProcesses { get; }
 
-        Task Add(TempCatalogItemInfo item);
+        Task Add(TempCatalogItemInfo item, VideoCdnSettings currentSettings);
         void Cancel(TempCatalogItemInfo item);
         Task StartNextIfCan();
 

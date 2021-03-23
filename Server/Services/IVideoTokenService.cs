@@ -5,7 +5,8 @@ namespace VideoCdn.Web.Server.Services
 {
     public interface IVideoTokenService
     {
-        Task<string> GenerateToken(string fileId);
-        Task<bool> VerifyToken(string token, string fileId);
+        public Task<bool> ValidateToken(string token, string fileId, string expiry);
+
+        public string GenerateInternalToken(string fileId, DateTime expiry);
     }
 }

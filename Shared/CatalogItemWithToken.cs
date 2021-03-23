@@ -19,6 +19,8 @@ namespace VideoCdn.Web.Shared
 
         public string Token { get; set; }
 
+        public string TokenExpiry { get; set; }
+
         public bool TokenRequired => Token is not null or "";
     }
 }

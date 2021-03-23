@@ -24,6 +24,32 @@ namespace VideoCdn.Web.Server.Services
             _chunkedInProgress = chunkedInProgress;
         }
 
+        public async Task<TempCatalogItemInfo> UploadSingle(VideoUploadModel model)
+        {
+            string type = Path.GetExtension(model.ToUpload.FileName);
+
+            var fileId = Guid.NewGuid().ToString("D");
+            string localPath = Path.Combine(_options.TempFilePath, fileId);
+            localPath += type;
+            using var fs = File.Open(localPath, FileMode.CreateNew);
+            await model.ToUpload.CopyToAsync(fs);
+
+            var item = new CatalogItem
+            {
+                FileId = fileId,
+                Title = model.Title,
+            };
+
+            await _dbContext.Catalog.AddAsync(item);
+
+            return new TempCatalogItemInfo
+            {
+                Id = item.Id,
+                FileId = fileId,
+                Title = model.Title,
+            };
+        }
+
         public string StartChunked(StartChunkUploadModel info)
         {
             string id = Guid.NewGuid().ToString("N");

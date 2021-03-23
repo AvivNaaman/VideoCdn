@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -16,76 +18,61 @@ namespace VideoCdn.Web.Server.Services
         private readonly VideoServerOptions _options;
         private readonly ISettingsService<VideoCdnSettings> _settingsService;
 
-        private readonly ICryptoTransform encryptor;
-        private readonly ICryptoTransform decryptor;
+        private List<HMACSHA512> hashes = new();
+        private HMACSHA512 defaultHash;
 
         public VideoTokenService(IOptions<VideoServerOptions> options, ISettingsService<VideoCdnSettings> settingsService)
         {
             _options = options.Value;
             _settingsService = settingsService;
 
-            var rijndael = new RijndaelManaged();
-            rijndael.Key = Encoding.UTF8.GetBytes(_options.VideoTokenKey);
-            rijndael.IV = new byte[16];
-            rijndael.Padding = PaddingMode.Zeros;
+            var externalKeys = _settingsService.Settings?.TokenKeys?
+                .Select(key => new HMACSHA512(Encoding.UTF8.GetBytes(key.Value)));
+            hashes.AddRange(externalKeys);
 
-            encryptor = rijndael.CreateEncryptor(rijndael.Key, rijndael.IV);
-            decryptor = rijndael.CreateDecryptor(rijndael.Key, rijndael.IV);
+            defaultHash = new(Encoding.UTF8.GetBytes(_options.DefaultVideoTokenKey));
+            hashes.Add(defaultHash);
         }
 
-        public Task<string> GenerateToken(string fileId)
-        {
-            var expiry = DateTime.Now.AddMinutes(_settingsService.Settings.TokenExpiry);
-            string toEncrypt = string.Join(',', expiry.Ticks, fileId);
-            return EncryptDataWithAes(toEncrypt);
-        }
+        // A token is just a hash of the file name and the time with the specified key.
+        // We want to allow other apps to produce tokens that we'll accept.
 
-        public async Task<bool> VerifyToken(string token, string fileId)
+        // We'll validate by concatenating fileId & expiry (ticks!) and hashing them.
+        /// <summary>
+        /// Validates the validaty state of the token by the other provided data.
+        /// </summary>
+        /// <param name="token">The token</param>
+        /// <param name="fileId">The id of the requested file</param>
+        /// <param name="expiry">The expiry time of the token, in ticks</param>
+        /// <returns>Whether the token matches any of the validated keys.</returns>
+        public async Task<bool> ValidateToken(string token, string fileId, string expiry)
         {
-            var decrypted = await DecryptStringWithAes(token);
-            var decryptedParts = decrypted.Split(',');
-            if (long.TryParse(decryptedParts[0], out long expiryTicks))
+            // GUID formatted with "D" is 26-digit long.
+            if (fileId.Length != 32) return false;
+            // if ticks is not logn OR it's long but token already expired
+            if (!long.TryParse(expiry, out long expiryTicks) || expiryTicks <= DateTime.Now.Ticks)
             {
-                // both file id match & expiry is in the future
-                return expiryTicks > DateTime.Now.Ticks &&
-                    decryptedParts[1] == fileId.Substring(0, 26); // avoid padding!
+                return false;
+            }
+            string dataToHash = fileId + expiry.ToString();
+            var dataStream = new MemoryStream(Encoding.UTF8.GetBytes(dataToHash));
+            foreach (var hash in hashes)
+            {
+                var dataHash = await hash.ComputeHashAsync(dataStream);
+                if (Convert.ToBase64String(dataHash) == token) return true;
+
+                dataStream.Position = 0;
             }
             return false;
         }
 
-        private async Task<string> EncryptDataWithAes(string toEncrypt)
+        /// <summary>
+        /// Generate a token using the default (internal) key, specified in the appsettings.json file.
+        /// </summary>
+        public string GenerateInternalToken(string fileId, DateTime expiry)
         {
-            byte[] encryptedBytes;
-            using (MemoryStream ms = new())
-            {
-                using (CryptoStream cs = new(ms, encryptor, CryptoStreamMode.Write))
-                {
-                    using (StreamWriter sw = new(cs, Encoding.UTF8))
-                    {
-                        await sw.WriteAsync(toEncrypt);
-                        await cs.FlushFinalBlockAsync();
-                    }
-                    encryptedBytes = ms.ToArray();
-                }
-            }
-            
-            return Convert.ToBase64String(encryptedBytes);
+            string dataToHash = fileId + expiry.Ticks.ToString();
+            return Convert.ToBase64String(defaultHash.ComputeHash(Encoding.UTF8.GetBytes(dataToHash)));
         }
-
-        private async Task<string> DecryptStringWithAes(string toDecrypt)
-        {
-            var toDecryptBytes = Convert.FromBase64String(toDecrypt);
-            using (MemoryStream ms = new(toDecryptBytes))
-            {
-                using (CryptoStream cs = new(ms, decryptor, CryptoStreamMode.Read))
-                {
-                    using (StreamReader sr = new(cs, Encoding.UTF8))
-                    {
-                        return await sr.ReadToEndAsync();
-                    }
-                }
-            }
-        }
-
     }
 }

@@ -51,7 +51,8 @@ else
                     <td>
                         @foreach (var res in item.AvailableResolutions.Split(','))
                         {
-                            <a href="@($"{baseVideoUrl}/{item.FileId}/{res}.mp4?token={System.Web.HttpUtility.UrlEncode(item.Token)}")" target="_blank">@(res)p</a><text>&nbsp;</text>
+                            <a href="@($"{baseVideoUrl}/{item.FileId}/{res}.mp4?token={System.Web.HttpUtility.UrlEncode(item.Token)}&expiry={item.TokenExpiry}")"
+                               target="_blank">@(res)p</a><text>&nbsp;</text>
                         }
                     </td>
                 </tr>

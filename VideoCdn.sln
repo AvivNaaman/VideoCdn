@@ -9,6 +9,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoCdn.Web.Client", "Clie
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoCdn.Web.Shared", "Shared\VideoCdn.Web.Shared.csproj", "{3B286802-5942-4714-AE1F-7F31CDDDCB42}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{3FCF2D50-8B9B-4A12-BE50-B28F30F91A34}"
+	ProjectSection(SolutionItems) = preProject
+		DbCleanup.sql = DbCleanup.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

@@ -18,7 +18,7 @@ namespace VideoCdn.Web.Server.Controllers
     [Authorize]
     public class VideosController : ControllerBase
     {
-        public static readonly string[] ValidVideoTypes = { ".mp4", ".mkv", ".mov" };
+        public static readonly string[] ValidVideoTypes = { ".mp4", ".mkv", ".mov", ".avi", ".wmv" };
         const long MaxUploadSize = 1048576; // 1 MB
         private readonly VideoServerOptions _options;
         private readonly IUploadService _uploadService;
@@ -45,13 +45,9 @@ namespace VideoCdn.Web.Server.Controllers
             if (!ValidVideoTypes.Any(t => type == t))
                 return BadRequest($"Invalid file type: {type}. Valid types are {string.Join(", ", ValidVideoTypes)}");
 
-            var id = Guid.NewGuid().ToString("D");
-            string localPath = Path.Combine(_options.TempFilePath, id);
-            localPath += type;
-            using var fs = System.IO.File.Open(localPath, FileMode.CreateNew);
-            await model.ToUpload.CopyToAsync(fs);
-
-            return id;
+            var res = await _uploadService.UploadSingle(model);
+            await _encodingService.AddToEncodingQueue(res);
+            return Ok(res.FileId);
         }
 
         [HttpPost]
@@ -81,7 +77,7 @@ namespace VideoCdn.Web.Server.Controllers
             if (id is null or "") return BadRequest();
             var res = await _uploadService.FinishChunked(id);
             await _encodingService.AddToEncodingQueue(res);
-            return Ok();
+            return Ok(res.FileId);
         }
 
         [HttpPost]
@@ -103,10 +99,17 @@ namespace VideoCdn.Web.Server.Controllers
 
         [HttpGet]
         [Route("[action]")]
-        [AllowAnonymous]
         public ActionResult<List<EnqueuedItemModel>> Queue()
         {
             return _encodingService.GetQueue();
+        }
+
+        [HttpPost]
+        [Route("Queue/[action]")]
+        public ActionResult Cancel(int itemId)
+        {
+            _encodingService.RemoveFromEncodingQueue(itemId);
+            return Ok();
         }
     }
 }

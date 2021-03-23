@@ -10,7 +10,7 @@ namespace VideoCdn.Web.Server.Options
         public string TempFilePath { get; set; } = Path.GetTempPath();
         public H264Codecs VideoH264Codec { get; set; }
 
-        public string VideoTokenKey { get; set; }
+        public string DefaultVideoTokenKey { get; set; }
     }
 
     public enum H264Codecs

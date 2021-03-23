@@ -8,5 +8,7 @@ namespace VideoCdn.Web.Server.Models
     {
         [Required]
         public IFormFile ToUpload { get; set; }
+        [Required]
+        public string Title { get; set; }
     }
 }

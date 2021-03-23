@@ -55,6 +55,7 @@ namespace VideoCdn.Web.Server
 
             services.AddScoped<IVideoEncodingService, VideoEncodingService>();
             services.AddScoped<IUploadService, UploadService>();
+            services.AddScoped<IWatchCounterService, WatchCounterService>();
 
             services.AddTransient<StartupSetup>();
 
@@ -119,7 +120,7 @@ namespace VideoCdn.Web.Server
 
             app.UseBlazorFrameworkFiles();
 
-            app.UseMiddleware<VideoTokenMiddleware>();
+            app.UseMiddleware<VideoMiddleware>();
 
             try
             {

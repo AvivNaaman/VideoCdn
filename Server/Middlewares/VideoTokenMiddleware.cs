@@ -8,58 +8,84 @@ using VideoCdn.Web.Shared;
 
 namespace VideoCdn.Web.Server.Middlewares
 {
-    public class VideoTokenMiddleware
+    public class VideoMiddleware
     {
         private readonly RequestDelegate _next;
         private readonly ISettingsService<VideoCdnSettings> _settingsService;
         private readonly IVideoTokenService _tokenService;
-        private readonly ILogger<VideoTokenMiddleware> logger;
+        private IWatchCounterService _watchCounterService;
         private static PathString videosPath = new PathString("/Videos");
 
-        public VideoTokenMiddleware(RequestDelegate next,
+        public VideoMiddleware(RequestDelegate next,
             ISettingsService<VideoCdnSettings> settingsService,
-            IVideoTokenService tokenService, ILogger<VideoTokenMiddleware> logger)
+            IVideoTokenService tokenService)
         {
             _next = next;
             _settingsService = settingsService;
             _tokenService = tokenService;
-            this.logger = logger;
         }
 
-        public async Task Invoke(HttpContext context)
+        public async Task Invoke(HttpContext context,
+            IWatchCounterService watchCounterService)
         {
-            Stopwatch w = new();
-            w.Start();
-            // handle only requests of type /Videos/FileId/res.mp4
-            if (_settingsService.Settings.UseTokens &&
-                context.Request.Path.StartsWithSegments(videosPath))
+            // Middleware only applies to videos.
+            if (context.Request.Path.StartsWithSegments(videosPath))
             {
-                try
+                _watchCounterService = watchCounterService;
+                // return 403 if not allowed (token/params are invalid)
+                if (_settingsService.Settings.UseTokens)
                 {
-                    string token = context.Request.Query["token"];
-                    if (token is not null or "")
+                    if (!await ProcessAuthorization(context))
                     {
-                        var parts = context.Request.Path.Value.Split('/');
-                        if (parts.Length >= 4)
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        return; 
+                    }
+                }
+
+                // add to watch counter if not added yet
+                if (_settingsService.Settings.EnableWatchesCounter)
+                {
+                    await ProcessWatchCounter(context);
+                }
+            }
+            await _next(context);
+        }
+
+        /// <summary>
+        /// Returns whether the user is authorized to continue.
+        /// </summary>
+        public async Task<bool> ProcessAuthorization(HttpContext context)
+        {
+            // handle only requests of type /Videos/FileId/res.mp4
+            try
+            {
+                string token = context.Request.Query["token"];
+                string expiry = context.Request.Query["expiry"];
+                if (token is not null or "" &&
+                    expiry is not null or "" && long.Parse(expiry) > DateTime.Now.Ticks)
+                {
+                    var parts = context.Request.Path.Value.Split('/');
+                    if (parts.Length >= 4)
+                    {
+                        string fileId = parts[2];
+                        // validate that expiry is a valid date & validate the date with the token
+                        if (await _tokenService.ValidateToken(token, fileId, expiry))
                         {
-                            string fileId = parts[2];
-                            // validate that expiry is a valid date & validate the date with the token
-                            if (await _tokenService.VerifyToken(token, fileId))
-                            {
-                                await _next(context);
-                                logger.LogInformation("VideoTokenMiddleware allowed user for video in {0}", w.Elapsed);
-                                return;
-                            }
+                            return true;
                         }
                     }
                 }
-                catch { }
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                logger.LogInformation("VideoTokenMiddleware failed user for video in {0}", w.Elapsed);
-                return;
             }
-            await _next(context);
-            logger.LogInformation("VideoTokenMiddleware skipped in {0}", w.Elapsed);
+            catch { }
+            return false;
+        }
+
+        public async Task ProcessWatchCounter(HttpContext context)
+        {
+            string token = context.Request.Query["token"];
+            string expiry = context.Request.Query["expiry"];
+            string fileId = context.Request.Path.Value.Split('/')[2];
+            await _watchCounterService.TryAddWatch(fileId, token, expiry);
         }
     }
 }

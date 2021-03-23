@@ -14,7 +14,7 @@ namespace VideoCdn.Web.Server.Controllers
 {
     [ApiController]
     [Route("/api/v1/[controller]")]
-    [Authorize(/*Roles = "Admin"*/)]
+    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly ISettingsService<VideoCdnSettings> _settingsService;
@@ -36,17 +36,55 @@ namespace VideoCdn.Web.Server.Controllers
             return _settingsService.Settings;
         }
 
+
         [HttpPost]
         [Route("[action]")]
         public async Task<ActionResult> Settings(VideoCdnSettings settings)
         {
-            _settingsService.Settings = settings;
+            var keyDictionary = _settingsService.Settings.TokenKeys; // save
+
+            _settingsService.Settings = settings; // assign new
+            _settingsService.Settings.TokenKeys = keyDictionary; // restore keys
+            await _settingsService.Save();
+            return Ok();
+        }
+
+        [HttpGet]
+        [Route("Settings/[action]")]
+        public async Task<ActionResult<string>> GenerateKey(string name)
+        {
+            // name is null or empty or used
+            if (name is null or "" || _settingsService.Settings.TokenKeys.TryGetValue(name, out _)) return BadRequest();
+
+            const string KeyChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgjiklmnopqrstuvwxyz0123456789!@#$%^&*";
+            const int KeyLength = 20;
+
+            string newKey = "";
+            var rnd = new Random();
+            for (int i = 0; i < KeyLength; i++)
+            {
+                newKey += KeyChars[rnd.Next(0, KeyChars.Length)];
+            }
+
+            _settingsService.Settings.TokenKeys.Add(name, newKey);
+            await _settingsService.Save();
+            return newKey;
+        }
+
+
+
+        [HttpPost]
+        [Route("Settings/[action]")]
+        public async Task<ActionResult<string>> RemoveKey(string name)
+        {
+            // name is null or empty or used
+            if (name is null or "" || !_settingsService.Settings.TokenKeys.TryGetValue(name, out _)) return BadRequest();
+            _settingsService.Settings.TokenKeys.Remove(name);
             await _settingsService.Save();
             return Ok();
         }
 
         const int MaxPageSize = 20;
-
         [HttpGet]
         [Route("Users/NumberOfPages")]
         public async Task<ActionResult<int>> UsersNumberOfPages()
@@ -74,6 +112,7 @@ namespace VideoCdn.Web.Server.Controllers
             }
             // pagination
             var usersList = await users
+                .OrderBy(u => u.Id)
                 .Take(MaxPageSize)
                 .ToListAsync();
 
