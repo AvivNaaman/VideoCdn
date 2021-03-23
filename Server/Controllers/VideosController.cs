@@ -99,9 +99,9 @@ namespace VideoCdn.Web.Server.Controllers
 
         [HttpGet]
         [Route("[action]")]
-        public ActionResult<List<EnqueuedItemModel>> Queue()
+        public ActionResult<IEnumerable<EnqueuedItemModel>> Queue()
         {
-            return _encodingService.GetQueue();
+            return _encodingService.GetQueue().ToList();
         }
 
         [HttpPost]

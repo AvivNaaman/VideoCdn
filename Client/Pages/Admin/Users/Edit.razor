@@ -24,7 +24,31 @@ else
             <ValidationMessage For="() => model.Email" />
         </div>
 
-        <button class="btn btn-success" type="submit">Save</button>
+        @if (roles is not null)
+        {
+            <div class="form-group">
+                <label>Roles</label>
+                <ul class="list-group">
+                    @foreach (var role in roles)
+                    {
+                        <li class="list-group-item">
+                            <div class="custom-control custom-checkbox">
+                                <InputCheckbox @bind-Value="role.IsInRole" DisplayName="" class="custom-control-input" id="@("roleCheck_"+role.Role)" />
+                                <label for="@("roleCheck_"+role.Role)" class="custom-control-label">
+                                    @role.Role
+                                </label>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <h6>Fetching roles..</h6>
+        }
+
+        <button class="btn btn-success" type="submit">Save &amp; Close</button>
     </EditForm>
 }
 @code {
@@ -34,25 +58,26 @@ else
 
     private UserModel model;
 
-    private List<string> allRoles;
-
-    private List<string> userRoles;
-    private List<string> leftRoles;
-
-    string currSelection = "";
+    private List<NotReadOnlyKvp> roles;
 
     protected async override Task OnInitializedAsync()
     {
         model = await http.GetFromJsonAsync<UserModel>($"/api/v1/Admin/GetUserById?id={Id}");
-        userRoles = model.Roles.ToList();
 
-        allRoles = await http.GetFromJsonAsync<List<string>>("/api/v1/Admin/Roles");
-        // TODO: Future: Add/Remove roles
+        roles = (await http.GetFromJsonAsync<List<string>>("/api/v1/Admin/Roles"))
+            .Select(r => new NotReadOnlyKvp { Role = r, IsInRole = model.Roles.Contains(r) }).ToList();
     }
 
     private async Task ValidSubmit()
     {
-        await http.PostAsJsonAsync<UserModel>($"/api/v1/Admin/UpdateUser", model);
+        model.Roles = roles.Where(r => r.IsInRole == true).Select(r => r.Role);
+        await http.PostAsJsonAsync<UserModel>($"/api/v1/Admin/Users/Update", model);
         navigation.NavigateTo("/admin/users");
+    }
+
+    private class NotReadOnlyKvp
+    {
+        public string Role { get; set; }
+        public bool IsInRole { get; set; }
     }
 }

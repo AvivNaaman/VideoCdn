@@ -14,8 +14,6 @@ namespace VideoCdn.Web.Server.Services
 {
     public class VideoEncodingQueue : IVideoEncodingQueue
     {
-        const int MaxRunningProcesses = 1;
-
         private readonly ILogger<VideoEncodingQueue> _logger;
         private readonly VideoServerOptions _options;
 
@@ -52,7 +50,7 @@ namespace VideoCdn.Web.Server.Services
 
         public async Task StartNextIfCan()
         {
-            if (RunningProcesses < MaxRunningProcesses && waitingTasks.Any())
+            if (RunningProcesses < _options.MaxRunningProcesses && waitingTasks.Any())
             {
                 var toStart = waitingTasks.First();
                 toStart.Value.RunningProcess = new()
@@ -65,8 +63,9 @@ namespace VideoCdn.Web.Server.Services
                         CreateNoWindow = true,
                         RedirectStandardError = true,
                         RedirectStandardInput = false,
-                        RedirectStandardOutput = false
+                        RedirectStandardOutput = false,
                     },
+                    //PriorityClass = ProcessPriorityClass.BelowNormal,
                     EnableRaisingEvents = true,
                 };
                 toStart.Value.RunningProcess.Exited += Process_Exited;
@@ -100,9 +99,9 @@ namespace VideoCdn.Web.Server.Services
             await StartNextIfCan();
         }
 
-        public (List<TempCatalogItemInfo> Waiting, List<TempCatalogItemInfo> Running) GetQueues()
+        public (IEnumerable<TempCatalogItemInfo> Waiting, IEnumerable<TempCatalogItemInfo> Running) GetQueues()
         {
-            return (waitingTasks.Keys.ToList(), runningTasks.Keys.ToList());
+            return (waitingTasks.Keys, runningTasks.Keys);
         }
 
         public void CancelById(int itemId)

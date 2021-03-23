@@ -34,62 +34,122 @@ namespace VideoCdn.Web.Server
 
         public async Task Run()
         {
-            if (!Directory.Exists(options.TempFilePath))
+            EnsureOptionsValid();
+            await EnsureDbValid();
+            await EnsureAdminWithRights();
+        }
+
+        private void EnsureOptionsValid()
+        {
+            try
             {
-                logger.LogInformation("Path '{0}' for temp data does not exist. Creating it.", options.TempFilePath);
-                Directory.CreateDirectory(options.TempFilePath);
+                if (!Directory.Exists(options.TempFilePath))
+                {
+                    logger.LogInformation("Path '{0}' for temp data does not exist. Creating it.", options.TempFilePath);
+                    Directory.CreateDirectory(options.TempFilePath);
+                }
             }
-            if (!Directory.Exists(options.DataPath))
+            catch (IOException ioe)
             {
-                logger.LogInformation("Path '{0}' for video data does not exist. Creating it.", options.DataPath);
-                Directory.CreateDirectory(options.DataPath);
+                logger.LogError("An exception was thrown while trying to access the temp folder {0}: {1}", options.TempFilePath, ioe);
             }
 
-            // Migrate DB To latest version
-            var migrations = await dbContext.Database.GetPendingMigrationsAsync();
-            if (migrations.Any())
+            try
             {
-                logger.LogInformation("There are {0} unapplied migrations. Applying now...", migrations.Count());
-                await dbContext.Database.MigrateAsync();
+                if (!Directory.Exists(options.DataPath))
+                {
+                    logger.LogInformation("Path '{0}' for video data does not exist. Creating it.", options.DataPath);
+                    Directory.CreateDirectory(options.DataPath);
+                }
+            }
+            catch (IOException ioe)
+            {
+                logger.LogError("An exception was thrown while trying to access the data folder {0}: {1}", options.DataPath, ioe);
             }
 
-            // Add roles, ensure super admin existence & etc.
-            var sa = await userManager.FindByNameAsync(adminOptions.UserName);
-            if (sa is null)
+            // Check FFMpeg thread/process limitation and notify if values are not right
+            if (options.MaxRunningProcesses <= 0)
             {
-                logger.LogInformation("Super admin {0} ({1}) does not exist. Creating.", adminOptions.UserName, adminOptions.Email);
-                sa = new() { UserName = adminOptions.UserName, Email = adminOptions.Email };
-                await userManager.CreateAsync(sa, adminOptions.Password);
+                logger.LogWarning("Max running encoding processes is set to {0}, Which is invalid." +
+                    " If you'd like to disable the encoding for the current instance," +
+                    " Please turn encoding off for all resolutions via the portal," +
+                    "under admin/settings.", options.MaxRunningProcesses);
             }
-            else if (adminOptions.ForceSetPassword)
+            if (options.ThreadsPerStream < 0)
             {
-                logger.LogInformation("Super admin is forced to reset password.");
-                await userManager.ResetPasswordAsync(sa,
-                    await userManager.GeneratePasswordResetTokenAsync(sa),
-                    adminOptions.Password);
+                logger.LogWarning("Threads per process is set to {0}, Which is invalid." +
+                    "The value should 0 (which means - no limit) or any other integer (which will set the limit explicitly)" +
+                    " If you'd like to disable the encoding for the current instance," +
+                    " Please turn encoding off for all resolutions via the portal," +
+                    "under admin/settings.", options.ThreadsPerStream);
             }
+        }
 
-            // add to role (create if role does not exist)
-            var role = await roleManager.FindByNameAsync("Admin");
-            bool roleExistedBefore = role is not null;
-            if (role is null)
+        private async Task EnsureDbValid()
+        {
+            try
             {
-                role = new IdentityRole<int>("Admin");
-                logger.LogInformation("The Admin role does not exist. Creating.");
-                await roleManager.CreateAsync(role);
+                // Migrate DB To latest version
+                var migrations = await dbContext.Database.GetPendingMigrationsAsync();
+                if (migrations.Any())
+                {
+                    logger.LogInformation("There are {0} unapplied migrations. Applying now...", migrations.Count());
+                    await dbContext.Database.MigrateAsync();
+                }
             }
-
-            // add user if not in role (check if role wasn't just created
-            bool isInRole = false;
-            if (roleExistedBefore)
+            catch (Exception e)
             {
-                isInRole = await userManager.IsInRoleAsync(sa, "Admin");
+                logger.LogError("An exception was thrown while migrating the database to the latest version: {0}", e);
             }
+        }
 
-            if (!isInRole)
+        private async Task EnsureAdminWithRights()
+        {
+            try
             {
-                logger.LogInformation("Adding the new Super Admin to the Admin role.");
-                await userManager.AddToRoleAsync(sa, "Admin");
+                // Add roles, ensure super admin existence & etc.
+                var sa = await userManager.FindByNameAsync(adminOptions.UserName);
+                if (sa is null)
+                {
+                    logger.LogInformation("Super admin {0} ({1}) does not exist. Creating.", adminOptions.UserName, adminOptions.Email);
+                    sa = new() { UserName = adminOptions.UserName, Email = adminOptions.Email };
+                    await userManager.CreateAsync(sa, adminOptions.Password);
+                }
+                else if (adminOptions.ForceSetPassword)
+                {
+                    logger.LogInformation("Super admin is forced to reset password.");
+                    await userManager.ResetPasswordAsync(sa,
+                        await userManager.GeneratePasswordResetTokenAsync(sa),
+                        adminOptions.Password);
+                }
+
+                // add to role (create if role does not exist)
+                var role = await roleManager.FindByNameAsync("Admin");
+                bool roleExistedBefore = role is not null;
+                if (role is null)
+                {
+                    role = new IdentityRole<int>("Admin");
+                    logger.LogInformation("The Admin role does not exist. Creating.");
+                    await roleManager.CreateAsync(role);
+                }
+
+                // add user if not in role (check if role wasn't just created
+                bool isInRole = false;
+                if (roleExistedBefore)
+                {
+                    isInRole = await userManager.IsInRoleAsync(sa, "Admin");
+                }
+
+                if (!isInRole)
+                {
+                    logger.LogInformation("Adding the new Super Admin to the Admin role.");
+                    await userManager.AddToRoleAsync(sa, "Admin");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError("An exception was thrown while ensurign that the admin user exists," +
+                    " with correct password and in the Admin role: {0}", ex);
             }
         }
     }

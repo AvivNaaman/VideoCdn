@@ -11,14 +11,14 @@ namespace VideoCdn.Web.Shared
         public bool Encode480p { get; set; } = true;
         public bool Encode720p { get; set; } = true;
         public bool Encode1080p { get; set; } = true;
-        public bool Encode2160p { get; set; }
-        public bool Encode4320p { get; set; }
+        public bool Encode2160p { get; set; } = false;
+        public bool Encode4320p { get; set; } = false;
         public bool KeepCache { get; set; } = false;
 
         public bool UseTokens { get; set; } = true;
         // In minutes
         public int TokenExpiry { get; set; } = 60 * 2; // 2 hrs
-        public Dictionary<string,string> TokenKeys { get; set; }
+        public Dictionary<string, string> TokenKeys { get; set; } = new();
 
         public bool EnableWatchesCounter { get; set; } = false;
 
@@ -47,9 +47,9 @@ namespace VideoCdn.Web.Shared
                 .Where(p => p.Name.StartsWith("Encode") && p.Name.EndsWith("p")
                             && p.PropertyType == typeof(bool))
                 .Where(p => (bool)p.GetValue(this))
-                .Select(p => p.Name.Replace("Encode", string.Empty));
+                .Select(p => p.Name.Replace("Encode", string.Empty).TrimEnd('p'));
 
-            return string.Join(", ", enabled);
+            return string.Join(",", enabled);
         }
     }
 }

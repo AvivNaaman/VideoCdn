@@ -1,1 +1,1 @@
-{"Encode360p":false,"Encode480p":true,"Encode720p":true,"Encode1080p":true,"Encode2160p":true,"Encode4320p":false,"KeepCache":false,"UseTokens":true,"TokenExpiry":120,"TokenKeys":{"Test":"2Rv^VgO3TO#jXgqua53r"},"EnableWatchesCounter":false}
+{"Encode360p":true,"Encode480p":true,"Encode720p":true,"Encode1080p":true,"Encode2160p":true,"Encode4320p":true,"KeepCache":false,"UseTokens":true,"TokenExpiry":120,"TokenKeys":{},"EnableWatchesCounter":false}

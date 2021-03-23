@@ -13,7 +13,7 @@ namespace VideoCdn.Web.Server.Services
         void Cancel(TempCatalogItemInfo item);
         Task StartNextIfCan();
 
-        (List<TempCatalogItemInfo> Waiting, List<TempCatalogItemInfo> Running) GetQueues();
+        (IEnumerable<TempCatalogItemInfo> Waiting, IEnumerable<TempCatalogItemInfo> Running) GetQueues();
         void CancelById(int itemId);
     }
 }

@@ -1,7 +1,8 @@
-﻿@page "/search"
+﻿@page "/videos"
 @inject HttpClient http
-<h1>Search</h1>
+<h1>Videos</h1>
 <EditForm Model="model" OnValidSubmit="Refresh" class="pb-2">
+    <h4>Filter &amp; Search</h4>
     <div class="form-group">
         <label>By text:</label>
         <InputText @bind-Value="model.Text" class="form-control" />
@@ -36,6 +37,7 @@ else
                 <th>Title</th>
                 <th>Uploaded</th>
                 <th>Watch</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -55,11 +57,17 @@ else
                                target="_blank">@(res)p</a><text>&nbsp;</text>
                         }
                     </td>
+                    <td>
+                        <NavLink href="@($"/videos/{item.Id}")">
+                            <span class="oi oi-pencil" aria-hidden="true"></span>
+                            Edit
+                        </NavLink>
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
-    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" />
+    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" OnCurrentPageChanged="Refresh" />
 }
 
 
@@ -88,10 +96,5 @@ else
         Items = await http.GetFromJsonAsync<List<CatalogItemWithToken>>($"/api/v1/Catalog/Search?{queries}");
     }
 
-    private async Task ChangePageTo(int newPage)
-    {
-        model.Page = newPage;
-        await Refresh();
-    }
 
 }

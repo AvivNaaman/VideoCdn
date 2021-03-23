@@ -37,9 +37,13 @@
     [Parameter]
     public int NumberOfPages { get; set; }
 
+    [Parameter]
+    public EventCallback OnCurrentPageChanged { get; set; }
+
     private async Task ChangePageTo(int to)
     {
         CurrentPage = to;
-        await CurrentPageChanged.InvokeAsync();
+        await CurrentPageChanged.InvokeAsync(CurrentPage);
+        await OnCurrentPageChanged.InvokeAsync();
     }
 }

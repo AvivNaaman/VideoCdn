@@ -7,7 +7,7 @@
 
 <button class="m-2 btn btn-primary" @onclick="@(() => navigation.NavigateTo("/admin/users/create"))">Create</button>
 
-<EditForm Model="model">
+<EditForm Model="model" OnValidSubmit="Refresh">
     <div class="form-group">
         <label>By User Name or Email</label>
         <InputText @bind-Value="model.Text" class="form-control" />
@@ -37,17 +37,25 @@ else
         <tbody>
             @foreach (var u in data)
             {
-            <tr>
-                <td>@u.Id</td>
-                <td>@u.UserName</td>
-                <td>@u.Email</td>
-                <td>@string.Join(", ", u.Roles)</td>
-                <td></td>
-            </tr>
+                <tr>
+                    <td>@u.Id</td>
+                    <td>@u.UserName</td>
+                    <td>@u.Email</td>
+                    <td>@string.Join(", ", u.Roles)</td>
+                    <td>
+                        <NavLink href="@($"/admin/users/{u.Id}")" class="text-dark">
+                            <span class="oi oi-pencil"></span> Edit
+                        </NavLink>
+                        |
+                        <button class="btn" @onclick="async () => await RemoveUser(u.Id)">
+                            <span class="oi oi-trash text-danger"></span> Remove
+                        </button>
+                    </td>
+                </tr>
             }
         </tbody>
     </table>
-    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" />
+    <Pagination @bind-CurrentPage="model.Page" NumberOfPages="pages" OnCurrentPageChanged="Refresh"/>
 }
 
 @code {
@@ -64,5 +72,10 @@ else
     private async Task Refresh()
     {
         data = await http.GetFromJsonAsync<List<UserModel>>($"/api/v1/Admin/Users?{model.DataToQueryString()}");
+    }
+
+    private async Task RemoveUser(int id)
+    {
+        await http.PostAsync($"/api/v1/Admin/Users/Delete?id={id}", null);
     }
 }

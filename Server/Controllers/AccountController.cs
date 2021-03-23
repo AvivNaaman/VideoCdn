@@ -65,12 +65,5 @@ namespace VideoCdn.Web.Server.Controllers
 
             return new JwtSecurityTokenHandler().WriteToken(descriptor);
         }
-
-        [HttpGet]
-        [Route("CreateAccountFast")]
-        public async Task<ActionResult<IdentityResult>> CreateAccountFast(string userName, string password, string email)
-        {
-            return Ok(await _userManager.CreateAsync(new() { UserName = userName, Email = email }, password));
-        }
     }
 }

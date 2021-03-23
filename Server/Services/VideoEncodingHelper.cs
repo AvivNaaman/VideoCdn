@@ -16,7 +16,8 @@ namespace VideoCdn.Web.Server.Services
         /// <param name="fileName">The original file path</param>
         /// <param name="dataPath">The destination folder (a sub folder will be created by the provided file name)</param>
         /// <returns>The arguments for ffmpeg</returns>
-        public static async Task<string> BuildEncodingArgs(string fileName, VideoServerOptions options, VideoCdnSettings settings)
+        public static async Task<string> BuildEncodingArgs(string fileName, VideoServerOptions options,
+            VideoCdnSettings settings)
         {
             var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
 
@@ -36,7 +37,7 @@ namespace VideoCdn.Web.Server.Services
             // TODO: check hardware acceleration
             var info = await FFmpeg.GetMediaInfo(fullPath);
 
-            string args = $" -i \"{fullPath}\" ";
+            string args = $"-threads {options.ThreadsPerStream} -i \"{fullPath}\" ";
 
             var audio = info.AudioStreams.FirstOrDefault()
                 ?.SetCodec(AudioCodec.aac);
@@ -46,7 +47,7 @@ namespace VideoCdn.Web.Server.Services
                 var video360 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Nhd);
-                args += GetOutputArgs(video360, audio, "360", destinationDir);
+                args += GetOutputArgs(video360, audio, "360", destinationDir, options.ThreadsPerStream);
             }
 
             if (settings.Encode480p)
@@ -54,7 +55,7 @@ namespace VideoCdn.Web.Server.Services
                 var video480 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Hd480);
-                args += GetOutputArgs(video480, audio, "480", destinationDir);
+                args += GetOutputArgs(video480, audio, "480", destinationDir, options.ThreadsPerStream);
             }
 
             if (settings.Encode720p)
@@ -62,7 +63,7 @@ namespace VideoCdn.Web.Server.Services
                 var video720 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Hd720);
-                args += GetOutputArgs(video720, audio, "720", destinationDir);
+                args += GetOutputArgs(video720, audio, "720", destinationDir, options.ThreadsPerStream);
             }
 
             if (settings.Encode1080p)
@@ -70,7 +71,7 @@ namespace VideoCdn.Web.Server.Services
                 var video1080 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Hd1080);
-                args += GetOutputArgs(video1080, audio, "1080", destinationDir);
+                args += GetOutputArgs(video1080, audio, "1080", destinationDir, options.ThreadsPerStream);
             }
 
             if (settings.Encode2160p)
@@ -78,7 +79,7 @@ namespace VideoCdn.Web.Server.Services
                 var video2160 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Uhd2160);
-                args += GetOutputArgs(video2160, audio, "2160", destinationDir);
+                args += GetOutputArgs(video2160, audio, "2160", destinationDir, options.ThreadsPerStream);
             }
 
 
@@ -87,7 +88,7 @@ namespace VideoCdn.Web.Server.Services
                 var video1440 = info.VideoStreams.FirstOrDefault()
                     ?.SetCodec(videoCodec)
                     ?.SetSize(VideoSize.Uhd4320);
-                args += GetOutputArgs(video1440, audio, "4320", destinationDir);
+                args += GetOutputArgs(video1440, audio, "4320", destinationDir, options.ThreadsPerStream);
             }
             return args;
         }
@@ -95,11 +96,11 @@ namespace VideoCdn.Web.Server.Services
 
 
         private static string GetOutputArgs(IVideoStream codecToAdd, IAudioStream audio,
-            string suffix, string destDir)
+            string suffix, string destDir, int threadsPerStream)
         {
             string newFileName = $"{suffix}.mp4";
             string outPath = Path.Combine(destDir, newFileName);
-            return $" {codecToAdd.Build()} {audio?.Build()} \"{outPath}\" ";
+            return $" {codecToAdd.Build()} {audio?.Build()} -threads {threadsPerStream} \"{outPath}\" ";
         }
     }
 }

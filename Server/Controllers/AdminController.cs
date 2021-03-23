@@ -125,7 +125,7 @@ namespace VideoCdn.Web.Server.Controllers
                     Id = user.Id,
                     Email = user.Email,
                     UserName = user.UserName,
-                    Roles = (await _userManager.GetRolesAsync(user)).ToList()
+                    Roles = await _userManager.GetRolesAsync(user)
                 });
             }
             return final;
@@ -142,6 +142,7 @@ namespace VideoCdn.Web.Server.Controllers
         [Route("[action]")]
         public async Task<ActionResult<UserModel>> GetUserById(int id)
         {
+            if (id <= 0) return BadRequest();
             var u = await _userManager.Users
                 .FirstOrDefaultAsync(u => u.Id == id);
             var roles = await _userManager.GetRolesAsync(u);
@@ -150,15 +151,17 @@ namespace VideoCdn.Web.Server.Controllers
                 Id = u.Id,
                 UserName = u.UserName,
                 Email = u.Email,
-                Roles = roles.ToList()
+                Roles = roles
             };
         }
 
 
-        [HttpGet]
-        [Route("[action]")]
+        [HttpPost]
+        [Route("Users/Update")]
         public async Task<ActionResult<UserModel>> UpdateUser(UserModel updatedUser)
         {
+            if (!ModelState.IsValid) return BadRequest();
+
             var u = await _userManager.Users
                 .FirstOrDefaultAsync(u => u.Id == updatedUser.Id);
             if (u is null) return NotFound();
@@ -166,7 +169,41 @@ namespace VideoCdn.Web.Server.Controllers
             u.Email = updatedUser.Email;
             u.UserName = updatedUser.UserName;
             await _userManager.UpdateAsync(u);
+
+           
+            // Roles
+            var oldRoles = await _userManager.GetRolesAsync(u);
+            // = all the old roles, except ones that are now accepted.
+            var rolesToRemove = oldRoles.Where(or => !updatedUser.Roles.Contains(or));
+            // = all the new roles, excpet the ones that are already there.
+            var rolesToAdd = updatedUser.Roles.Where(nr => !oldRoles.Contains(nr));
+            if (rolesToAdd.Any())
+            {
+                await _userManager.AddToRolesAsync(u, rolesToAdd);
+            }
+            if (rolesToRemove.Any())
+            {
+                await _userManager.RemoveFromRolesAsync(u, rolesToRemove);
+            }
+
             return Ok();
+        }
+
+        [HttpPost]
+        [Route("Users/Create")]
+        public async Task<ActionResult<UserModel>> CreateUser(CreateUserModel updatedUser)
+        {
+            if (ModelState.IsValid)
+            {
+                var u = new VideoCdnUser
+                {
+                    Email = updatedUser.Email,
+                    UserName = updatedUser.UserName,
+                };
+                await _userManager.CreateAsync(u, updatedUser.InitPassword);
+                return Ok();
+            }
+            return BadRequest();
         }
     }
 }

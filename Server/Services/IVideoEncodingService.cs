@@ -8,7 +8,8 @@ namespace VideoCdn.Web.Server.Services
     public interface IVideoEncodingService
     {
         Task AddToEncodingQueue(TempCatalogItemInfo item);
-        List<EnqueuedItemModel> GetQueue();
+        IEnumerable<EnqueuedItemModel> GetQueue();
         void RemoveFromEncodingQueue(int itemId);
+        void RemoveEncodedResolutions(string fileId, IEnumerable<string> toRemove);
     }
 }

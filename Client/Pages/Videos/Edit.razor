@@ -1,0 +1,93 @@
+﻿@page "/videos/{id:int}"
+@inject HttpClient http
+@inject NavigationManager navigation
+
+<h1>Edit Video</h1>
+
+@if (model is null)
+{
+    <h6>Loading...</h6>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="ValidSubmit">
+        <DataAnnotationsValidator />
+        <div class="form-group">
+            <label>Title</label>
+            <InputText @bind-Value="model.Title" class="form-control" />
+            <ValidationMessage For="() => model.Title" />
+        </div>
+        @if (availableResolutions is not null && availableResolutions.Count > 0)
+        {
+            <div class="form-group">
+                <h6>Remove video files</h6>
+                <div class="alert alert-danger">
+                    <b>Notice! This action is not recoverable!</b>
+                    <p>Check the resolutions that you'd like to delete, and then press the 'Save &amp; Confirm' button to trigger the action.</p>
+                </div>
+                <ul class="list-group">
+                    @foreach (var resolution in availableResolutions)
+                    {
+                        <li class="list-group-item">
+
+                            <div class="custom-control custom-checkbox">
+                                <InputCheckbox class="custom-control-input" @bind-Value="resolution.ShouldBeRemoved" DisplayName="" id="@("check" + resolution.Resolution)" />
+                                <label class="custom-control-label" for="@("check" + resolution.Resolution)">@(resolution + "p")</label>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+        else
+        {
+            <h6>Nothing encoded, so nothing to delete!</h6>
+        }
+        <button class="btn btn-primary" type="submit"> Save &amp; Close</button>
+        <button class="btn btn-danger" type="button">Delete video instead</button>
+    </EditForm>
+
+}
+
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private EditCatalogItemModel model;
+
+    private List<NotReadOnlyResCheckedPair> availableResolutions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var video = await http.GetFromJsonAsync<CatalogItem>($"/api/v1/Catalog/GetById?id={Id}");
+        availableResolutions = video.AvailableResolutions.Split(',')
+            .Select(rs => new NotReadOnlyResCheckedPair() { Resolution = rs, ShouldBeRemoved = false }).ToList();
+        model = new EditCatalogItemModel
+        {
+            Id = video.Id,
+            Title = video.Title
+        };
+    }
+
+    private async Task ValidSubmit()
+    {
+        model.ResolutionsToRemove = availableResolutions.Where(r => r.ShouldBeRemoved)
+            .Select(r => r.Resolution).ToList();
+        await http.PostAsJsonAsync("/api/v1/Catalog/Update", model);
+        navigation.NavigateTo("/Videos");
+    }
+
+    private class NotReadOnlyResCheckedPair
+    {
+        public string Resolution { get; set; }
+        public bool ShouldBeRemoved { get; set; }
+    }
+
+    private async Task RemoveItem()
+    {
+        await http.PostAsync($"/api/v1/Catalog/Remove?id={model.Id}", null);
+        navigation.NavigateTo("/Videos");
+    }
+
+}

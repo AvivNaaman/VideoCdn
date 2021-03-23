@@ -3,7 +3,7 @@
 @inject HttpClient http
 @inject NavigationManager navigation
 
-<h1>Edit User</h1>
+<h1>Create User</h1>
 <EditForm Model="model" OnValidSubmit="ValidSubmit">
     <DataAnnotationsValidator />
     <div class="form-group">
@@ -18,6 +18,12 @@
         <ValidationMessage For="() => model.Email" />
     </div>
 
+    <div class="form-group">
+        <label>Password</label>
+        <InputText class="form-control" type="password" @bind-Value="model.InitPassword" />
+        <ValidationMessage For="() => model.InitPassword" />
+    </div>
+
     <button class="btn btn-success" type="submit">Create</button>
 </EditForm>
 
@@ -26,7 +32,7 @@
 
     private async Task ValidSubmit()
     {
-        await http.PostAsJsonAsync<CreateUserModel>($"/api/v1/Admin/CreateUser", model);
+        await http.PostAsJsonAsync<CreateUserModel>($"/api/v1/Admin/Users/Create", model);
         navigation.NavigateTo("/admin/users");
     }
 }

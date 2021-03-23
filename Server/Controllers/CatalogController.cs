@@ -19,12 +19,15 @@ namespace VideoCdn.Web.Server.Controllers
         private VideoCdnDbContext _dbContext;
         private readonly IVideoTokenService _tokenService;
         private readonly ISettingsService<VideoCdnSettings> _settingsService;
+        private readonly IVideoEncodingService _encodingService;
 
-        public CatalogController(VideoCdnDbContext dbContext, IVideoTokenService tokenService, ISettingsService<VideoCdnSettings> settingsService)
+        public CatalogController(VideoCdnDbContext dbContext, IVideoTokenService tokenService,
+            ISettingsService<VideoCdnSettings> settingsService, IVideoEncodingService encodingService)
         {
             _dbContext = dbContext;
             _tokenService = tokenService;
             _settingsService = settingsService;
+            _encodingService = encodingService;
         }
 
         [HttpGet]
@@ -61,7 +64,7 @@ namespace VideoCdn.Web.Server.Controllers
 
         [HttpGet]
         [Route("[action]")]
-        public async Task<ActionResult<List<CatalogItemWithToken>>> Search([FromQuery] CatalogSearchModel model)
+        public async Task<ActionResult<IEnumerable<CatalogItemWithToken>>> Search([FromQuery] CatalogSearchModel model)
         {
 
             // read-only!
@@ -92,12 +95,13 @@ namespace VideoCdn.Web.Server.Controllers
             q = q.Take(MaxPageSize);
             var list = await q.ToListAsync();
 
-            // make it a list with tokens & stuff
-            var toReturn = new List<CatalogItemWithToken>();
 
             // produce tokens (& expiry) if needed to
             if (_settingsService.Settings.UseTokens)
             {
+                // make it a list with tokens & stuff
+                var toReturn = new List<CatalogItemWithToken>();
+
                 DateTime expiry = DateTime.Now.AddMinutes(_settingsService.Settings.TokenExpiry);
                 foreach (var item in list)
                 {
@@ -110,9 +114,39 @@ namespace VideoCdn.Web.Server.Controllers
                     }
                     toReturn.Add(newItem);
                 }
+                return toReturn;
+            }
+            else
+            {
+                // just map all the data to the right model & return it.
+                return list.Select(i => new CatalogItemWithToken(i)).ToList();
+            }
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        public async Task<ActionResult> Update(EditCatalogItemModel model)
+        {
+            if (!ModelState.IsValid) return BadRequest();
+
+            var item = await _dbContext.Catalog.FirstOrDefaultAsync(i => i.Id == model.Id);
+            if (item is null) return NotFound();
+
+            item.Title = model.Title;
+
+            // remove & update resolutions
+            if (model.ResolutionsToRemove is not null &&
+                model.ResolutionsToRemove.Count > 0)
+            {
+                var existingResolutions = item.AvailableResolutions.Split(',').ToList();
+                var toRemove = existingResolutions.Where(er => model.ResolutionsToRemove.Contains(er));
+                _encodingService.RemoveEncodedResolutions(item.FileId, toRemove);
+                item.AvailableResolutions = string.Join(',',existingResolutions.RemoveAll(r => toRemove.Contains(r)));
             }
 
-            return toReturn;
+            _dbContext.Update(item);
+            await _dbContext.SaveChangesAsync();
+            return Ok();
         }
     }
 }

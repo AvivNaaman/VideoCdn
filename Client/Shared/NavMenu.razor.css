@@ -40,6 +40,11 @@
         line-height: 3rem;
     }
 
+
+    .nav-item.disabled ::deep a {
+        color: #c4c4c4 !important;
+    }
+
 .nav-item ::deep a.active {
     background-color: rgba(255,255,255,0.25);
     color: white;

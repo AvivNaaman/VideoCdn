@@ -1,10 +1,103 @@
 ﻿@page "/"
+@inject HttpClient http
+@using ChartJs.Blazor.PieChart;
+@using ChartJs.Blazor
 
-    <AuthorizeView>
-        <Authorized>
-            <h2>Use the menu to navigate through the different sections.</h2>
-        </Authorized>
-        <NotAuthorized>
-            <h2><span class="oi oi-lock-locked"></span>Authorize to continue in the portal</h2>
-        </NotAuthorized>
-    </AuthorizeView>
+
+
+<AuthorizeView>
+    <Authorized>
+        <h1>Dashboard</h1>
+        <h4>Use the menu to navigate through the different sections.</h4>
+
+        @if (data is null || sizeChartConfig?.Data?.Datasets?.Count <= 0)
+        {
+            <h6>Loading data...</h6>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-12 col-md-6">
+                    <Chart Config="sizeChartConfig"></Chart>
+                </div>
+                <div class="col-12 col-md-6">
+                    <h5>Number of videos: @data.NumberOfVideos</h5>
+                    <h5>Number of users: @data.NumberOfUsers</h5>
+                    @if (data.TotalWatches > -1)
+                    {
+                        <h5>Number of video watches: @data.TotalWatches</h5>
+                    }
+                    <span>Data refreshed at @data.Produced</span>
+                    <button @onclick="ForceRefresh">Reload data</button>
+                </div>
+            </div>
+        }
+
+
+    </Authorized>
+    <NotAuthorized>
+        <h2><span class="oi oi-lock-locked"></span>Authorize to continue in the portal</h2>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter]
+    public Task<AuthenticationState> AuthState { get; set; }
+
+    private StatsModel data;
+
+    private PieConfig sizeChartConfig;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!(await AuthState).User.Identity.IsAuthenticated) return;
+
+        data = await http.GetFromJsonAsync<StatsModel>("/api/v1/Stats");
+
+        sizeChartConfig = new()
+        {
+            Options = new()
+            {
+                Responsive = true,
+                Title = new()
+                {
+                    Display = true,
+                    Text = "Size of disk used by data path"
+                }
+            }
+        };
+
+        sizeChartConfig.Data.Labels.Add("Used by VideoCdn data folder");
+        sizeChartConfig.Data.Labels.Add("Used by other apps");
+        sizeChartConfig.Data.Labels.Add("Free");
+
+
+    }
+
+    private async Task ForceRefresh()
+    {
+        data = null;
+
+        data = await http.GetFromJsonAsync<StatsModel>("/api/v1/Stats?forceReproduce=true");
+        UpdateUiByData();
+        sizeChartConfig.Data.Datasets.Clear();
+    }
+
+    private void UpdateUiByData()
+    {
+
+        double dataUsePrecentage = (data.UsedSizeByData * 100.0) / data.TotalDataDriveSize;
+        double otherUsePrecntage = ((data.UsedSize * 100.0) / data.TotalDataDriveSize) - dataUsePrecentage;
+        double freePrecentage = 100.0 - ((data.UsedSize * 100.0) / data.TotalDataDriveSize);
+        var sizeDs = new PieDataset<double>(new double[] { Math.Round(dataUsePrecentage, 3),
+            Math.Round(otherUsePrecntage, 3), Math.Round(freePrecentage, 3) });
+        sizeDs.BackgroundColor = new[]
+        {
+            ColorUtil.ColorHexString(255, 99, 132),
+            ColorUtil.ColorHexString(255, 205, 86),
+            ColorUtil.ColorHexString(75, 192, 192)
+        };
+
+        sizeChartConfig.Data.Datasets.Add(sizeDs);
+    }
+}

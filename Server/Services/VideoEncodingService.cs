@@ -20,13 +20,15 @@ namespace VideoCdn.Web.Server.Services
         private readonly IVideoEncodingQueue _queue;
         private readonly ISettingsService<VideoCdnSettings> _settingsService;
         private readonly VideoCdnDbContext _dbContext;
+        private readonly VideoServerOptions _options;
 
         public VideoEncodingService(IVideoEncodingQueue queue, ISettingsService<VideoCdnSettings> settingsService,
-            VideoCdnDbContext dbContext)
+            VideoCdnDbContext dbContext, IOptions<VideoServerOptions> options)
         {
             _queue = queue;
             _settingsService = settingsService;
             _dbContext = dbContext;
+            _options = options.Value;
         }
 
         public async Task AddToEncodingQueue(TempCatalogItemInfo item)
@@ -45,13 +47,21 @@ namespace VideoCdn.Web.Server.Services
             _queue.CancelById(itemId);
         }
 
-        public List<EnqueuedItemModel> GetQueue()
+        public void RemoveEncodedResolutions(string fileId, IEnumerable<string> toRemove)
+        {
+            toRemove.ToList().ForEach(tr =>
+            {
+                File.Delete(Path.Combine(_options.DataPath, fileId, tr + ".mp4"));
+            });
+        }
+
+        public IEnumerable<EnqueuedItemModel> GetQueue()
         {
             var (waiting, running) = _queue.GetQueues();
             var toReturn = new List<EnqueuedItemModel>();
             toReturn.AddRange(waiting.Select(wi => new EnqueuedItemModel { Item = wi, Status = EncodingStatus.Waiting, Started = wi.StartTime }));
             toReturn.AddRange(running.Select(wi => new EnqueuedItemModel { Item = wi, Status = EncodingStatus.Running, Started = wi.StartTime }));
-            return toReturn.ToList();
+            return toReturn;
         }
     }
 }
